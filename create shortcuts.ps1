@@ -1,3 +1,11 @@
+#########TODO########
+#--------------------
+#allow -notmatch in file specification
+#fix =============== color diplaying error
+#add foeder creation for sending items
+#add support for sending items to multiple forlders
+
+
 ############################ Functions ##################################
 
 function New-EnvironmentalVariable
