@@ -1,9 +1,15 @@
 #########TODO########
 #--------------------
-#allow -notmatch in file specification
-#fix =============== color diplaying error
-#add foeder creation for sending items
-#add support for sending items to multiple forlders
+#CHECK{x} #allow -notmatch in file specification
+#CHECK{x} #separate global:req messages into variables
+#CHECK{x} #fix =============== color diplaying error
+#CHECK{x} #add folder creation for sending items
+#CHECK{x} #add support for sending items to multiple forlders
+#CHECK{x} #add support for copying items
+#CHECK{} #fix item printing at the end of the funtions
+#CHECK{} #add support for match and notmatch in file specification
+#CHECK{} #separate new-env function from other functions
+#CHECK{} #join repetitive code at the start of functions into one function
 
 
 ############################ Functions ##################################
@@ -18,7 +24,7 @@ function New-EnvironmentalVariable
         $requestedScope = "user";
     }
     #If console has Admin priviledges then the host has the option to decide over user o machine scope.
-    elseif($Global:isAdmin){
+    else{
         Write-Output "";
         $message = "Choose the scope for the environmental variable";
         $user = New-Object System.Management.Automation.Host.ChoiceDescription "&USER", "To use USER scope.";
@@ -44,17 +50,38 @@ function New-EnvironmentalVariable
     [System.Environment]::GetEnvironmentVariables($requestedScope).GetEnumerator() | Where-Object Name -eq $varName;
 }
 
+
 function New-Shortcut([array] $AvailableFiles)
 {
-    $Global:reqPathToSendFiles = Read-HostPath "`nEnter the complete path in which you want to send the item(s) `n";
+    [bool] $createFolderBasedOnName = $false;
+    
+    $Global:reqPathToSendFiles = Test-CreateFolders $Global:message_reqPathToSendFiles;
+    #Created for cases where host chooses to create folders based on names.
+    $current_reqPathToSendFiles = $Global:reqPathToSendFiles;
+
+    #Checks for the '?' char at the end that was left at the end if the host said yes to the creation of folders based on names.
+    if ($Global:reqPathToSendFiles.EndsWith('?')) {
+        $createFolderBasedOnName = $true
+    }
+
     foreach($file in $AvailableFiles)
     {
+        if ($createFolderBasedOnName) {
+            #Eliminates the extension form the file.
+            $tmpFileWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($file)
+            #It created the folder for the name specified.
+            New-Item -Path $Global:reqPathToSendFiles -Name $tmpFileWithoutExtension -ItemType Directory -Force > $null;
+
+            #Change the variable reqPathToSendFiles to a new one that has the file name in front of it.
+            $current_reqPathToSendFiles = [System.IO.Path]::Combine($Global:reqPathToSendFiles,$tmpFileWithoutExtension)
+        }
+
         #Replace changes the file extension to the one that shortcuts have, which is 'lnk'.
         $fileRenameExtension = [System.IO.Path]::ChangeExtension($file,"lnk");
-        $createShortcut = [System.IO.Path]::Combine($Global:reqPathToSendFiles,$fileRenameExtension);
+        $createShortcut = [System.IO.Path]::Combine($current_reqPathToSendFiles,$fileRenameExtension);
         $arguments = $null;
         $targetPath = [System.IO.Path]::Combine($Global:reqPathToWork,$file);
-        $workingDirectory = $Global:reqPathToSendFiles;
+        $workingDirectory = $current_reqPathToSendFiles;
 
         $extension = [System.IO.Path]::GetExtension($file);
         #Sees if any file is a Powershell script to ask the host what to do.
@@ -72,8 +99,7 @@ function New-Shortcut([array] $AvailableFiles)
             #Powershell program location, PSHOME contains the installation path.
             if ($PSVersionTable.PSVersion.Major -le 5) {
                 $targetPath = "$PSHOME\powershell.exe";
-            }
-            else {
+            }else {
                 #Powershell name changes to pwsh in version 6 and higher.
                 $targetPath = "$PSHOME\pwsh.exe";
             }
@@ -109,12 +135,71 @@ function New-Shortcut([array] $AvailableFiles)
     Get-Item "$Global:reqPathToSendFiles\*" -Include $AvailableFiles;
 }
 
-function New-SymbolicLink([array] $AvailableFiles)
+
+function Copy-Files([array] $AvailableFiles)
 {
-    $Global:reqPathToSendFiles = Read-HostPath "`nEnter the complete path in which you want to send the item(s) `n";
+    [bool] $createFolderBasedOnName = $false;
+    
+    $Global:reqPathToSendFiles = Test-CreateFolders $Global:message_reqPathToSendFiles;
+    #Created for cases where host chooses to create folders based on names.
+    $current_reqPathToSendFiles = $Global:reqPathToSendFiles;
+
+    #Checks for the '?' char at the end that was left at the end if the host said yes to the creation of folders based on names.
+    if ($Global:reqPathToSendFiles.EndsWith('?')) {
+        $createFolderBasedOnName = $true
+    }
+
     foreach($file in $AvailableFiles)
     {
-        $pathSym = [System.IO.Path]::Combine($Global:reqPathToSendFiles,$file);
+        if ($createFolderBasedOnName) {
+            #Eliminates the extension form the file.
+            $tmpFileWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($file)
+            #It created the folder for the name specified.
+            New-Item -Path $Global:reqPathToSendFiles -Name $tmpFileWithoutExtension -ItemType Directory -Force > $null;
+            
+            #Change the variable reqPathToSendFiles to a new one that has the file name in front of it.
+            $current_reqPathToSendFiles = [System.IO.Path]::Combine($Global:reqPathToSendFiles,$tmpFileWithoutExtension)
+        }
+        
+        #Joins the path and the name of the original file
+        $filePath = [System.IO.Path]::Combine($Global:reqPathToWork,$file);
+        #Creates the copy, -Force is used to avoid errors in the console and -Recurse if the file is a folder.
+        Copy-Item -Path $filePath -Destination $current_reqPathToSendFiles -Recurse -Force > $null;
+    }
+
+    Write-Host "`n`nFiles copied";
+    Write-Host "`r------------" -NoNewline;
+    #Prints the shortcuts to the console.
+    Get-Item "$Global:reqPathToSendFiles\*" -Include $AvailableFiles;
+}
+
+
+function New-SymbolicLink([array] $AvailableFiles)
+{
+    [bool] $createFolderBasedOnName = $false;
+    
+    $Global:reqPathToSendFiles = Test-CreateFolders $Global:message_reqPathToSendFiles;
+    #Created for cases where host chooses to create folders based on names.
+    $current_reqPathToSendFiles = $Global:reqPathToSendFiles;
+
+    #Checks for the '?' char at the end that was left at the end if the host said yes to the creation of folders based on names.
+    if ($Global:reqPathToSendFiles.EndsWith('?')) {
+        $createFolderBasedOnName = $true
+    }
+
+    foreach($file in $AvailableFiles)
+    {
+        if ($createFolderBasedOnName) {
+            #Eliminates the extension form the file.
+            $tmpFileWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($file)
+            #It created the folder for the name specified.
+            New-Item -Path $Global:reqPathToSendFiles -Name $tmpFileWithoutExtension -ItemType Directory -Force > $null;
+            
+            #Change the variable reqPathToSendFiles to a new one that has the file name in front of it.
+            $current_reqPathToSendFiles = [System.IO.Path]::Combine($Global:reqPathToSendFiles,$tmpFileWithoutExtension)
+        }
+
+        $pathSym = [System.IO.Path]::Combine($current_reqPathToSendFiles,$file);
         $targetSym = [System.IO.Path]::Combine($Global:reqPathToWork,$file);
 
         #Symbolic links require Admin Privileges. 
@@ -130,11 +215,12 @@ function New-SymbolicLink([array] $AvailableFiles)
 }
 
 
+
 function Get-AvailableFiles
 {
     Write-Host "`n";
-    Write-Host "=====================================================" -ForegroundColor Black -BackgroundColor White;
-    
+    Write-Host "=======================================================j" -ForegroundColor Black -BackgroundColor White;
+    Write-Host "";
     [array] $AvailableFiles = @();  
     
     #If reqPathToWork has data, then it does not enter here.
@@ -148,19 +234,32 @@ function Get-AvailableFiles
     #Also, if it is the first time, it will enter by default because keepFiles is empty.
     if ($keepFiles -notmatch "[yY]") 
     {
-        $Global:reqPathToWork = Read-HostPath "`nEnter the complete path where the files are `n";
-        $Global:reqFileSpecification = Read-Host "`nEnter any file specification.
-            `rName, extension, or both. (wildcards NOT recommended | regex active).
-            `rIf nothing, press enter ";
+        $Global:reqPathToWork = Read-HostPath $Global:message_reqPathToWork;
+        $Global:reqFileSpecification = Read-Host $Global:message_reqFileSpecification;
     }
     
     do{
         [bool] $entriesChanged = $false;
         do{
-            #Gets all files inside the requested directory, 
-            #but only those files that satisfy the file extension that the host request
-            [array] $fileNames = (Get-Item "$Global:reqPathToWork\*" |
-             Where-Object Name -Match $Global:reqFileSpecification | Select-Object -ExpandProperty Name);
+            #If the host does not specify '?' to exclude, it enters here.
+            if ($Global:reqFileSpecification -notmatch '^(\s+)?\?') 
+            {   
+                #Gets all files inside the requested directory, 
+                #but only those files that satisfy the specification that the host request.
+                [array] $fileNames = (Get-Item "$Global:reqPathToWork\*" |
+                Where-Object Name -Match $Global:reqFileSpecification | Select-Object -ExpandProperty Name);
+            }
+            else #If the host wants to exclude files according to the specification, it enters here.
+            {
+                #Eliminates the '?' char that tells to exclude files with that name.
+                $excludeSignIndex = $Global:reqFileSpecification.IndexOf('?');
+                $excludeFileSpecification = $Global:reqFileSpecification.Substring($excludeSignIndex + 1);
+                #Gets all files inside the requested directory, 
+                #but only those files that DO NOT satisfy the specification that the host request.
+                [array] $fileNames = (Get-Item "$Global:reqPathToWork\*" |
+                Where-Object Name -NotMatch $excludeFileSpecification | Select-Object -ExpandProperty Name);
+            }
+            
 
             #If there are no files with the requested path and file extenison, then the function repeats
             #And it is requested to the host to change the values of one of the requests
@@ -169,7 +268,7 @@ function Get-AvailableFiles
             {
                 Write-Host "No files with the requests you enter exist here. Change them." -ForegroundColor Red;
                 #Gives the host the chance to change one of the entries.
-                Get-Entries; 
+                Update-Entries; 
             }
         }while($fileNames.Count -eq 0)
         
@@ -218,10 +317,10 @@ function Get-AvailableFiles
                 elseif($requestedFileName -in $fileNames){
                     $AvailableFiles = $requestedFileName;
                 }
-                #If host typed '*' Get-Entries function is invoke,
+                #If host typed '*' Update-Entries function is invoke,
                 #And the funtion will later repeat in the do..while loop that repeats almost the entirety of this funtion.
                 elseif($requestedFileName -eq '*'){
-                    Get-Entries;
+                    Update-Entries;
                     $entriesChanged = $true;
                 }
                 #If the file is specified is not inside the fileNames list, the host is warned,
@@ -237,7 +336,7 @@ function Get-AvailableFiles
 }
 
 
-function Get-Entries
+function Update-Entries
 {
     #These lines prints the current host's entries to the console.
     Write-Host "`nEntries" -ForegroundColor Yellow;
@@ -256,19 +355,21 @@ function Get-Entries
 
     switch($requestedChangeOption)
     {
-        0 {$Global:reqPathToWork = Read-HostPath "`nEnter the complete path in which you want to work in `n";}
-        1 {$Global:reqFileSpecification = Read-Host "`nEnter any file specification.
-              `rName, extension, or both. (wildcards NOT recommended | regex active).
-              `rIf nothing, press enter ";}
+        0 {$Global:reqPathToWork = Read-HostPath $Global:message_reqPathToWork}
+        1 {$Global:reqFileSpecification = Read-Host $Global:message_reqFileSpecification}
     }
 }
 
-function Read-HostPath([string] $message)
+
+function Read-HostPath([string] $message, [string] $pathRequested = '')
 {
     #Read-HostPath is similar to Read-Host command, but for testing paths.
-    do{
+    if ($pathRequested -eq '') {
         [string] $pathRequested = Read-Host $message;
-    }while([string]::IsNullOrEmpty($pathRequested))
+    }
+
+    #Eliminates any '"',"'" or white space at the beginning or end of the string.
+    $pathRequested = $pathRequested.Trim('\',"'",' ');
 
     #Proves that the path entry exits, and if not then it is said to the host to reenter the path.
     if(-not (Test-Path $pathRequested))
@@ -280,8 +381,59 @@ function Read-HostPath([string] $message)
           #Repeats the function if the path still not exist after reenter.
         }while(-not (Test-Path $pathRequested))
     }
+
     #And returns the path to the variable that requested.
     return [System.IO.Path]::GetFullPath($pathRequested);
+}
+
+
+function Test-CreateFolders([string] $message)
+{
+    #Gets the information the host enter.
+    do{
+        [string] $prompt_reqPathToSendFiles = Read-Host $message;
+    }while([string]::IsNullOrEmpty($prompt_reqPathToSendFiles))
+    
+    #If there is no '$' char, then it will proceed as normal, just the path will be tested.
+    if ($prompt_reqPathToSendFiles -ne '$') 
+    {
+        $pathRequested = Read-HostPath -message $message -pathRequested $prompt_reqPathToSendFiles;
+        return $pathRequested
+    }
+
+    $message = "============New folder creation=============";
+    $createFolders = New-Object System.Management.Automation.Host.ChoiceDescription "&Create folders", "It create new folders.";
+    $basedNameFolders = New-Object System.Management.Automation.Host.ChoiceDescription "Folders based on each file &name", "It create folders based on each file name.";
+    $bothFolders = New-Object System.Management.Automation.Host.ChoiceDescription "&Both", "It create new folders and folders based on each file name.";
+    $options = [System.Management.Automation.Host.ChoiceDescription[]]($createFolders, $basedNameFolders, $bothFolders);
+    #This creates a better prompt for choosing.
+    $requestedFolderOption = $host.ui.PromptForChoice("Folder",$message, $options, -1);
+
+    $parentPath = Read-HostPath "First enter the complete parent path where the new folders will leave."
+
+    switch($requestedFolderOption)
+    {
+        0 { [string] $newFolders = Read-Host "Now, enter the folder's name(s) to create
+                `rif multiple, separate them with '\' char ";
+            #Eliminates any '\' or white space at the beginning or end of the string.
+            $newFolders = $newFolders.Trim('\',' ');
+            #Joins both paths into a single.
+            $parentPath = [System.IO.Path]::Combine($parentPath,$newFolders);
+            return $parentPath
+        }
+        1 { #The '?' sign will later tell the program to create files based on names.
+            return $parentPath + "?"
+        }
+        2 { [string] $newFolders = Read-Host "NOTE: the folders based on the names will be created afterwards.
+                `rNow, enter the folder's name(s) to create
+                `rif multiple, separate them with '\' char ";
+            #Eliminates any '\' or white space at the beginning or end of the string.
+            $newFolders = $newFolders.Trim('\',' ');
+            #Joins both paths into a single.
+            $parentPath = [System.IO.Path]::Combine($parentPath,$newFolders);
+            return $parentPath + "?"
+        }
+    }
 }
 
 
@@ -300,14 +452,25 @@ $Global:isAdmin = $hostPriviledges.IsInRole([Security.Principal.WindowsBuiltInRo
 #Global variables.
 $Global:reqPathToWork, $Global:reqPathToSendFiles, $Global:reqFileSpecification = $null;
 
+#Global message variables.
+[string] $Global:message_reqPathToWork = "`nEnter the complete path where the files are `n";
+[string] $Global:message_reqFileSpecification = "`nEnter any specification to match with the file.
+    `rIf you want to exclude files that contains this specification, enter (`?) char at the beginning.
+    `rName, extension, or both. (wildcards NOT recommended | regex active).
+    `rIf nothing, press enter ";
+[string] $Global:message_reqPathToSendFiles = "`nEnter the complete path in which you want to send the item(s).
+    `rIf you want to create folder(s), enter only a dollar (`$) sign `n";
+
+
 do{
     $message = "============What do you want to create?=============";
     $envVar = New-Object System.Management.Automation.Host.ChoiceDescription "&Environmental Variable", "To create an environmental variable.";
     $shortcut = New-Object System.Management.Automation.Host.ChoiceDescription "&Shortcut", "To create a shortcut.";
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($envVar, $shortcut);
+    $copy = New-Object System.Management.Automation.Host.ChoiceDescription "&File copies", "To copy files.";
+    $options = [System.Management.Automation.Host.ChoiceDescription[]]($envVar, $shortcut, $copy);
     #If host is not Admin, the option for Symlink will not appear, because it requires Admin priviledges.
     if($Global:isAdmin){
-      $symlink = New-Object System.Management.Automation.Host.ChoiceDescription "Symbolic &Link", "To create a symbolic link.";
+      $symlink = New-Object System.Management.Automation.Host.ChoiceDescription "Sym&links", "To create a symbolic link.";
       $options += [System.Management.Automation.Host.ChoiceDescription[]]($symlink);
     }
     #This creates a better prompt for choosing.
@@ -323,7 +486,11 @@ do{
             [array] $availableFiles = Get-AvailableFiles;
             New-Shortcut $availableFiles;
         }
-        2 { #SymbolicLinks do require a file to reference.
+        2 { #Copies do require a file to reference.
+            [array] $availableFiles = Get-AvailableFiles;
+            Copy-Files $availableFiles;
+        }
+        3 { #SymbolicLinks do require a file to reference.
             [array] $availableFiles = Get-AvailableFiles;
             New-SymbolicLink $availableFiles;
         }
@@ -339,5 +506,6 @@ do{
 
 #Eliminates all script global variables.
 Remove-Variable -Scope Global -Name isAdmin,reqPathToWork,reqPathToSendFiles,reqFileSpecification;
+Remove-Variable -Scope Global -Name message_reqPathToWork,message_reqPathToSendFiles,message_reqFileSpecification;
 
 #END of the script
