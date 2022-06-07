@@ -10,6 +10,8 @@
 #CHECK{x} #add support for match and notmatch in file specification
 #CHECK{x} #separate new-env function from other functions
 #CHECK{x} #join repetitive code at the start of functions into one function
+#CHECK{x} #add execution policy to powershellScripts shortcuts
+#CHECK{x} #save fileNames before the fileSpecification to aviod problems with changing the specification
 
 
 ############################ Functions ##################################
@@ -63,6 +65,8 @@ function Start-CreationMethod([scriptblock] $Function, [array] $AvailableFiles)
     #Checks for the '?' char at the end that was left at the end if the host said yes to the creation of folders based on names.
     if ($Global:reqPathToSendFiles.EndsWith('?')) {
         $createFolderBasedOnName = $true
+        #Deletes the '?' from the string
+        $Global:reqPathToSendFiles = $Global:reqPathToSendFiles.TrimEnd('?');
     }
 
     foreach($file in $AvailableFiles)
@@ -78,7 +82,7 @@ function Start-CreationMethod([scriptblock] $Function, [array] $AvailableFiles)
         }
 
         #Calls the funtion that create the item.
-        Invoke-Command -ScriptBlock $Funciton -ArgumentList $current_reqPathToSendFiles,$file
+        $Function.Invoke($current_reqPathToSendFiles,$file)
     }
 }
 
@@ -120,7 +124,7 @@ function New-Shortcut($current_reqPathToSendFiles, $file)
         
         #Arguments after the targetPath. -noexit to keep the console running, and -command to run script.
         $scriptPath = [System.IO.Path]::Combine($Global:reqPathToWork,$file)
-        $arguments = "-NoExit -Command ""& { . '$scriptPath'}""";
+        $arguments = "-NoExit -ExecutionPolicy RemoteSigned -Command ""& { . '$scriptPath'}""";
     }
 
     #This WScript.Shell object is the one that has the properties to change settings in shortcuts.
@@ -172,7 +176,7 @@ function New-SymbolicLink($current_reqPathToSendFiles, $file)
 function Get-AvailableFiles
 {
     Write-Host "`n";
-    Write-Host "=======================================================j" -ForegroundColor Black -BackgroundColor White;
+    Write-Host "=======================================================" -ForegroundColor Black -BackgroundColor White;
     Write-Host "";
     [array] $AvailableFiles = @();  
     
@@ -194,6 +198,9 @@ function Get-AvailableFiles
     do{
         [bool] $entriesChanged = $false;
         do{
+            #fileNames is refreshed to aviod errors with changing the file specification.
+            [array] $fileNames = (Get-Item "$Global:reqPathToWork\*" | Select-Object -ExpandProperty Name);
+
             #Copies the request to a new variable to modify its value preserving the original input.
             [string] $current_reqFileSpecification = $Global:reqFileSpecification;
             #It splits the variable if there are any commas.
@@ -206,8 +213,8 @@ function Get-AvailableFiles
                 {   
                     #Gets all files inside the requested directory, 
                     #but only those files that satisfy the specification that the host request.
-                    [array] $fileNames = (Get-Item "$Global:reqPathToWork\*" -Include $fileNames |
-                    Where-Object Name -Match $fileSpecification | Select-Object -ExpandProperty Name);
+                    $fileNames = (Get-Item "$Global:reqPathToWork\*" -Include $fileNames |
+                        Where-Object Name -Match $fileSpecification | Select-Object -ExpandProperty Name);
                 }
                 else #If the host wants to exclude files according to the specification, it enters here.
                 {
@@ -216,8 +223,8 @@ function Get-AvailableFiles
                     $excludeFileSpecification = $fileSpecification.Substring($excludeSignIndex + 1);
                     #Gets all files inside the requested directory, 
                     #but only those files that DO NOT satisfy the specification that the host request.
-                    [array] $fileNames = (Get-Item "$Global:reqPathToWork\*" -Include $fileNames |
-                    Where-Object Name -NotMatch $excludeFileSpecification | Select-Object -ExpandProperty Name);
+                    $fileNames = (Get-Item "$Global:reqPathToWork\*" -Include $fileNames |
+                        Where-Object Name -NotMatch $excludeFileSpecification | Select-Object -ExpandProperty Name);
                 }
             }
             
@@ -226,7 +233,7 @@ function Get-AvailableFiles
             #until at least one file appear as usable.
             if($fileNames.Count -eq 0)
             {
-                Write-Host "No files with the requests you enter exist here. Change them." -ForegroundColor Red;
+                Write-Host "`nNo files with the requests you enter exist here. Change them." -ForegroundColor Red;
                 #Gives the host the chance to change one of the entries.
                 Update-Entries; 
             }
@@ -329,7 +336,7 @@ function Read-HostPath([string] $message, [string] $pathRequested = '')
     }
 
     #Eliminates any '"',"'" or white space at the beginning or end of the string.
-    $pathRequested = $pathRequested.Trim('\',"'",' ');
+    $pathRequested = $pathRequested.Trim('\','"',"'",' ');
 
     #Proves that the path entry exits, and if not then it is said to the host to reenter the path.
     if(-not (Test-Path $pathRequested))
@@ -369,28 +376,32 @@ function Test-CreateFolders([string] $message)
     #This creates a better prompt for choosing.
     $requestedFolderOption = $host.ui.PromptForChoice("Folder",$message, $options, -1);
 
-    $parentPath = Read-HostPath "First enter the complete parent path where the new folders will leave."
+    $parentPath = Read-HostPath "`nFirst enter the complete parent path where the new folders will leave "
 
     switch($requestedFolderOption)
     {
-        0 { [string] $newFolders = Read-Host "Now, enter the folder's name(s) to create
+        0 { [string] $newFolders = Read-Host "`nNow, enter the folder's name(s) to create
                 `rif multiple, separate them with '\' char ";
             #Eliminates any '\' or white space at the beginning or end of the string.
             $newFolders = $newFolders.Trim('\',' ');
             #Joins both paths into a single.
             $parentPath = [System.IO.Path]::Combine($parentPath,$newFolders);
+            #Creates the new folder.
+            New-Item -Path $parentPath -ItemType Directory -Force > $null;
             return $parentPath
         }
         1 { #The '?' sign will later tell the program to create files based on names.
             return $parentPath + "?"
         }
-        2 { [string] $newFolders = Read-Host "NOTE: the folders based on the names will be created afterwards.
+        2 { [string] $newFolders = Read-Host "`nNOTE: the folders based on the names will be created afterwards.
                 `rNow, enter the folder's name(s) to create
                 `rif multiple, separate them with '\' char ";
             #Eliminates any '\' or white space at the beginning or end of the string.
             $newFolders = $newFolders.Trim('\',' ');
             #Joins both paths into a single.
             $parentPath = [System.IO.Path]::Combine($parentPath,$newFolders);
+            #Creates the new folder.
+            New-Item -Path $parentPath -ItemType Directory -Force > $null;
             return $parentPath + "?"
         }
     }
