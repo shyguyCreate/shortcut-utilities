@@ -1,17 +1,9 @@
-#########TODO########
-#--------------------
-#CHECK{x} #allow -notmatch in file specification
-#CHECK{x} #separate global:req messages into variables
-#CHECK{x} #fix =============== color diplaying error
-#CHECK{x} #add folder creation for sending items
-#CHECK{x} #add support for sending items to multiple forlders
-#CHECK{x} #add support for copying items
-#CHECK{x} #fix item printing at the end of the funtions
-#CHECK{x} #add support for match and notmatch in file specification
-#CHECK{x} #separate new-env function from other functions
-#CHECK{x} #join repetitive code at the start of functions into one function
-#CHECK{x} #add execution policy to powershellScripts shortcuts
-#CHECK{x} #save fileNames before the fileSpecification to aviod problems with changing the specification
+#----------------------------------------------------------
+#
+#     Author of the script: shyguyCreate
+#                Github.com/shyguyCreate
+#
+#----------------------------------------------------------
 
 
 ############################ Functions ##################################
