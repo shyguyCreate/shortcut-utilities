@@ -49,7 +49,7 @@ function New-EnvironmentalVariable
 function Start-CreationMethod([scriptblock] $Function, [array] $AvailableFiles)
 {
     #Get the reqPathToSendFiles with a function to create folders if needed.
-    $Global:reqPathToSendFiles = Test-CreateFolders $Global:message_reqPathToSendFiles;
+    $Global:reqPathToSendFiles = Read-NewFolder $Global:message_reqPathToSendFiles;
 
     #Checks for the '?' char at the beginning for the creation of folders based on names.
     [bool] $createFolderBasedOnName = $Global:reqPathToSendFiles.StartsWith('?');
@@ -294,7 +294,7 @@ function Get-AvailableFiles
     return $AvailableFiles;
 }
 
-function Get-Entries 
+function Get-Entries
 {
     #These lines prints the current host's entries to the console.
     Write-Host "`nEntries" -ForegroundColor Yellow;
@@ -357,57 +357,39 @@ function Read-HostPath([string] $message, [string] $pathRequested = '')
 }
 
 
-function Test-CreateFolders([string] $message)
+function Read-NewFolder([string] $message)
 {
     #Gets the information the host enter.
     do{
         [string] $prompt_reqPathToSendFiles = Read-Host $message;
     }while([string]::IsNullOrEmpty($prompt_reqPathToSendFiles))
     
-    #If there is no '$' char, then it will proceed as normal, just the path will be tested.
-    if ($prompt_reqPathToSendFiles -ne '$') 
+    # -To create a non-existing directory.
+    if ($prompt_reqPathToSendFiles.StartsWith('+'))
     {
-        $pathRequested = Read-HostPath -message $message -pathRequested $prompt_reqPathToSendFiles;
-        return $pathRequested
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\+\s+','';
+        New-Item -Path $prompt_reqPathToSendFiles -ItemType Directory -Force > $null;
+    }
+    # -To create folder(s) based on the item(s) names
+    elseif ($prompt_reqPathToSendFiles.StartsWith('-')) 
+    {
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\-\s+','';
+        $prompt_reqPathToSendFiles = Read-HostPath -message $message -pathRequested $prompt_reqPathToSendFiles;
+        $prompt_reqPathToSendFiles = '?' + $prompt_reqPathToSendFiles;
+    }
+    # -To create both new directories and based on names folder(s)
+    elseif ($prompt_reqPathToSendFiles.StartsWith('*')) 
+    {
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\*\s+','';
+        New-Item -Path $prompt_reqPathToSendFiles -ItemType Directory -Force > $null;
+        $prompt_reqPathToSendFiles = '?' + $prompt_reqPathToSendFiles;
+    }
+    else #If there is no '+' '-' or '*' char, then it will proceed as normal and the path will be tested.
+    {
+        $prompt_reqPathToSendFiles = Read-HostPath -message $message -pathRequested $prompt_reqPathToSendFiles;
     }
 
-    $message = "============New folder creation=============";
-    $createFolders = New-Object System.Management.Automation.Host.ChoiceDescription "&Create folders", "It create new folders.";
-    $basedNameFolders = New-Object System.Management.Automation.Host.ChoiceDescription "Folders based on each file &name", "It create folders based on each file name.";
-    $bothFolders = New-Object System.Management.Automation.Host.ChoiceDescription "&Both", "It create new folders and folders based on each file name.";
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($createFolders, $basedNameFolders, $bothFolders);
-    #This creates a better prompt for choosing.
-    $requestedFolderOption = $host.ui.PromptForChoice("Folder",$message, $options, -1);
-
-    $parentPath = Read-HostPath "`nFirst enter the complete parent path where the new folders will leave "
-
-    switch($requestedFolderOption)
-    {
-        0 { [string] $newFolders = Read-Host "`nNow, enter the folder's name(s) to create
-                `rif multiple, separate them with '\' char ";
-            #Eliminates any '\' or white space at the beginning or end of the string.
-            $newFolders = $newFolders.Trim('\',' ');
-            #Joins both paths into a single.
-            $parentPath = [System.IO.Path]::Combine($parentPath,$newFolders);
-            #Creates the new folder.
-            New-Item -Path $parentPath -ItemType Directory -Force > $null;
-            return $parentPath
-        }
-        1 { #The '?' sign will later tell the program to create files based on names.
-            return $parentPath + "?"
-        }
-        2 { [string] $newFolders = Read-Host "`nNOTE: the folders based on the names will be created afterwards.
-                `rNow, enter the folder's name(s) to create
-                `rif multiple, separate them with '\' char ";
-            #Eliminates any '\' or white space at the beginning or end of the string.
-            $newFolders = $newFolders.Trim('\',' ');
-            #Joins both paths into a single.
-            $parentPath = [System.IO.Path]::Combine($parentPath,$newFolders);
-            #Creates the new folder.
-            New-Item -Path $parentPath -ItemType Directory -Force > $null;
-            return $parentPath + "?"
-        }
-    }
+    return $prompt_reqPathToSendFiles
 }
 
 
@@ -434,7 +416,10 @@ $Global:reqPathToWork, $Global:reqPathToSendFiles, $Global:reqFileSpecification 
     `rEnter name, extension, or both. (careful w/ wildcards | regex active).
     `rIf nothing, press enter ";
 [string] $Global:message_reqPathToSendFiles = "`nEnter the complete path in which you want to send the item(s).
-    `rIf you want to create folder(s), enter only a dollar (`$) sign `n";
+    `n`r  *Additional options:
+    `r    -To create a non-existing directory, specify '+' at the beginning of the path.
+    `r    -To create folder(s) based on the item(s) names, add '-' at the beginning.
+    `r    -To create both new directories and based on names folder(s), begin with '*'. `n`n";
 
 #Global variable to save created files.
 [array] $Global:createdFiles = @();
