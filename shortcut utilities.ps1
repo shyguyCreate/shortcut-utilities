@@ -367,20 +367,20 @@ function Read-NewFolder([string] $message)
     # -To create a non-existing directory.
     if ($prompt_reqPathToSendFiles.StartsWith('+'))
     {
-        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\+\s+','';
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\+(\s+)?','';
         New-Item -Path $prompt_reqPathToSendFiles -ItemType Directory -Force > $null;
     }
     # -To create folder(s) based on the item(s) names
     elseif ($prompt_reqPathToSendFiles.StartsWith('-')) 
     {
-        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\-\s+','';
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\-(\s+)?','';
         $prompt_reqPathToSendFiles = Read-HostPath -message $message -pathRequested $prompt_reqPathToSendFiles;
         $prompt_reqPathToSendFiles = '?' + $prompt_reqPathToSendFiles;
     }
     # -To create both new directories and based on names folder(s)
     elseif ($prompt_reqPathToSendFiles.StartsWith('*')) 
     {
-        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\*\s+','';
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\*(\s+)?','';
         New-Item -Path $prompt_reqPathToSendFiles -ItemType Directory -Force > $null;
         $prompt_reqPathToSendFiles = '?' + $prompt_reqPathToSendFiles;
     }
@@ -415,7 +415,7 @@ $Global:reqPathToWork, $Global:reqPathToSendFiles, $Global:reqFileSpecification 
     `rIf you want multiple matches, sepate them with commas and follow the same rules as above.
     `rEnter name, extension, or both. (careful w/ wildcards | regex active).
     `rIf nothing, press enter ";
-[string] $Global:message_reqPathToSendFiles = "`nEnter the complete path in which you want to send the item(s).
+[string] $Global:message_reqPathToSendFiles = "`n`nEnter the complete path in which you want to send the item(s).
     `n`r  *Additional options:
     `r    -To create a non-existing directory, specify '+' at the beginning of the path.
     `r    -To create folder(s) based on the item(s) names, add '-' at the beginning.
