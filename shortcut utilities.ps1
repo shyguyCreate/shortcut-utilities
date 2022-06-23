@@ -82,40 +82,40 @@ function New-Shortcut($current_reqPathToSendFiles, $file)
     #Replace changes the file extension to the one that shortcuts have, which is 'lnk'.
     $fileRenameExtension = [System.IO.Path]::ChangeExtension($file,"lnk");
     $createShortcut = [System.IO.Path]::Combine($current_reqPathToSendFiles,$fileRenameExtension);
-    $arguments = $null;
     $targetPath = [System.IO.Path]::Combine($Global:reqPathToWork,$file);
+    $arguments = '';
     $workingDirectory = $current_reqPathToSendFiles;
 
-    $extension = [System.IO.Path]::GetExtension($file);
     #Sees if any file is a Powershell script to ask the host what to do.
-    if($extension -eq '.ps1') {
+    if([System.IO.Path]::GetExtension($file) -eq '.ps1')
+    {
         do{
             $specialShortcut = Read-Host "`n""$file"" has been detected as a Powershell Script.
             `rDo you want to create a special Powershell Shortcut to run your script 
             `rinstead of a normal file shortcut? [Y/N]";
         }while($specialShortcut -notmatch "[yN]")
-    }
 
-    #If the host accepts to make a Powershell shortcut, it enters here.
-    if($specialShortcut -match "y")
-    {
-        #Powershell program location, PSHOME contains the installation path.
-        if ($PSVersionTable.PSVersion.Major -le 5) {
-            $targetPath = "$PSHOME\powershell.exe";
-        }else {
-            #Powershell name changes to pwsh in version 6 and higher.
-            $targetPath = "$PSHOME\pwsh.exe";
+        #If the host accepts to make a Powershell shortcut, it enters here.
+        if($specialShortcut -match "y")
+        {
+            #Powershell program location, PSHOME contains the installation path.
+            if ($PSVersionTable.PSVersion.Major -le 5) {
+                $targetPath = "$PSHOME\powershell.exe";
+            }else {
+                #Powershell name changes to pwsh in version 6 and higher.
+                $targetPath = "$PSHOME\pwsh.exe";
+            }
+            #If you use Windows Terminal and have it configure as the default terminal,
+            #It doesn't matter if it is a Powershell shortcut, it will still open Windows Terminal.
+                            
+            #Directory where powershell program will start on in command line.
+            #The same as the location of the file/script.
+            $workingDirectory = $Global:reqPathToWork;
+            
+            #Arguments after the targetPath. -noexit to keep the console running, and -command to run script.
+            $scriptPath = [System.IO.Path]::Combine($Global:reqPathToWork,$file)
+            $arguments = "-NoExit -ExecutionPolicy RemoteSigned -Command ""& { . '$scriptPath'}""";
         }
-        #If you use Windows Terminal and have it configure as the default terminal,
-        #It doesn't matter if it is a Powershell shortcut, it will still open Windows Terminal.
-                        
-        #Directory where powershell program will start on in command line.
-        #The same as the location of the file/script.
-        $workingDirectory = $Global:reqPathToWork;
-        
-        #Arguments after the targetPath. -noexit to keep the console running, and -command to run script.
-        $scriptPath = [System.IO.Path]::Combine($Global:reqPathToWork,$file)
-        $arguments = "-NoExit -ExecutionPolicy RemoteSigned -Command ""& { . '$scriptPath'}""";
     }
 
     #This WScript.Shell object is the one that has the properties to change settings in shortcuts.
@@ -123,10 +123,8 @@ function New-Shortcut($current_reqPathToSendFiles, $file)
     #WScript.Shell object creates a shortcut that requires the .lnk or .url extension.
     $Shortcut = $WshShell.CreateShortcut($createShortcut);
     $Shortcut.TargetPath = $targetPath;
+    $Shortcut.Arguments = $arguments;
     $Shortcut.WorkingDirectory = $workingDirectory;
-    if($null -ne $arguments){
-        $Shortcut.Arguments = $arguments;
-    }
     $Shortcut.Save();
     #If a shortcut already exists then the function just changes the settings that are specified.
 
