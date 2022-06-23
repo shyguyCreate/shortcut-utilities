@@ -175,6 +175,7 @@ function Get-AvailableFiles
     #If reqPathToWork has data, then it does not enter here.
     if ($null -ne $Global:reqPathToWork) {
         do {
+            Get-Entries; #Print the entries from the host
             $keepFiles = Read-Host "`nDo you want to keep both, the file location and file specification? [Y/N] "
         } while ($keepFiles -notmatch "[yN]")
     } 
@@ -294,9 +295,20 @@ function Get-AvailableFiles
     return $AvailableFiles;
 }
 
+function Get-Entries 
+{
+    #These lines prints the current host's entries to the console.
+    Write-Host "`nEntries" -ForegroundColor Yellow;
+    Write-Host "`r-------" -ForegroundColor Yellow;
+    Write-Host "Path location of files: $Global:reqPathToWork" -ForegroundColor Yellow;
+    Write-Host "File specification: $Global:reqFileSpecification`n" -ForegroundColor Yellow;
+}
+
 
 function Update-Entries
 {
+    Get-Entries; #Print the entries from the host
+
     #These lines prints the current host's entries to the console.
     Write-Host "`nEntries" -ForegroundColor Yellow;
     Write-Host "`r-------" -ForegroundColor Yellow;
