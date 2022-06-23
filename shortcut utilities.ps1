@@ -94,11 +94,11 @@ function New-Shortcut($current_reqPathToSendFiles, $file)
             $specialShortcut = Read-Host "`n""$file"" has been detected as a Powershell Script.
             `rDo you want to create a special Powershell Shortcut to run your script 
             `rinstead of a normal file shortcut? [Y/N]";
-        }while($specialShortcut -notmatch "[yYnN]")
+        }while($specialShortcut -notmatch "[yN]")
     }
 
     #If the host accepts to make a Powershell shortcut, it enters here.
-    if($specialShortcut -match "[yY]")
+    if($specialShortcut -match "y")
     {
         #Powershell program location, PSHOME contains the installation path.
         if ($PSVersionTable.PSVersion.Major -le 5) {
@@ -176,12 +176,12 @@ function Get-AvailableFiles
     if ($null -ne $Global:reqPathToWork) {
         do {
             $keepFiles = Read-Host "`nDo you want to keep both, the file location and file specification? [Y/N] "
-        } while ($keepFiles -notmatch "[yYnN]")
+        } while ($keepFiles -notmatch "[yN]")
     } 
     
     #If the host decide to change variables after wanting to create something more, it enters here.
     #Also, if it is the first time, it will enter by default because keepFiles is empty.
-    if ($keepFiles -notmatch "[yY]") 
+    if ($keepFiles -notmatch "y") 
     {
         $Global:reqPathToWork = Read-HostPath $Global:message_reqPathToWork;
         $Global:reqFileSpecification = Read-Host $Global:message_reqFileSpecification;
@@ -481,7 +481,7 @@ do{
 
   #If the host says yes then almost the entire program will start again.
   #Except for the host initial entries that will stay the same if the host decides to.
-}while($repeatRequest -match "[yY]")
+}while($repeatRequest -match "y")
 
 #Eliminates all script global variables.
 Remove-Variable -Scope Global -Name isAdmin,reqPathToWork,reqPathToSendFiles,reqFileSpecification,createdFiles;
