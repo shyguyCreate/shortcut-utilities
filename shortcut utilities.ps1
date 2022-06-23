@@ -48,18 +48,17 @@ function New-EnvironmentalVariable
 #This function is to not repeat the same code in all the tree functions that are below this one.
 function Start-CreationMethod([scriptblock] $Function, [array] $AvailableFiles)
 {
-    [bool] $createFolderBasedOnName = $false;
-    
+    #Get the reqPathToSendFiles with a function to create folders if needed.
     $Global:reqPathToSendFiles = Test-CreateFolders $Global:message_reqPathToSendFiles;
-    #Created for cases where host chooses to create folders based on names.
-    $current_reqPathToSendFiles = $Global:reqPathToSendFiles;
 
-    #Checks for the '?' char at the end that was left at the end if the host said yes to the creation of folders based on names.
-    if ($Global:reqPathToSendFiles.EndsWith('?')) {
-        $createFolderBasedOnName = $true
-        #Deletes the '?' from the string
-        $Global:reqPathToSendFiles = $Global:reqPathToSendFiles.TrimEnd('?');
-    }
+    #Checks for the '?' char at the beginning for the creation of folders based on names.
+    [bool] $createFolderBasedOnName = $Global:reqPathToSendFiles.StartsWith('?');
+
+    #Deletes the '?' from the string
+    $Global:reqPathToSendFiles = $Global:reqPathToSendFiles.TrimStart('?');
+
+    #Created for cases where host chooses to create folders based on names.
+    [string] $current_reqPathToSendFiles = $Global:reqPathToSendFiles;
 
     foreach($file in $AvailableFiles)
     {
