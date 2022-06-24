@@ -198,10 +198,13 @@ function Get-AvailableFiles
 
             foreach ($fileSpecification in $current_reqFileSpecification) 
             {
+                #Eliminates the white spaces
+                $fileSpecification = $fileSpecification.Trim();
+
                 #If the host does not specify '?' to exclude, it enters here.
-                if ($fileSpecification -notmatch '^(\s+)?\?') 
-                {   
-                    #Gets all files inside the requested directory, 
+                if ($fileSpecification -notmatch '^\s*\?')
+                {
+                    #Gets all files inside the requested directory,
                     #but only those files that satisfy the specification that the host request.
                     $fileNames = (Get-Item "$Global:reqPathToWork\*" -Include $fileNames |
                         Where-Object Name -Match $fileSpecification | Select-Object -ExpandProperty Name);
@@ -209,12 +212,11 @@ function Get-AvailableFiles
                 else #If the host wants to exclude files according to the specification, it enters here.
                 {
                     #Eliminates the '?' char that tells to exclude files with that name.
-                    $excludeSignIndex = $fileSpecification.IndexOf('?');
-                    $excludeFileSpecification = $fileSpecification.Substring($excludeSignIndex + 1);
-                    #Gets all files inside the requested directory, 
+                    $fileSpecification = $fileSpecification.TrimStart('?');
+                    #Gets all files inside the requested directory,
                     #but only those files that DO NOT satisfy the specification that the host request.
                     $fileNames = (Get-Item "$Global:reqPathToWork\*" -Include $fileNames |
-                        Where-Object Name -NotMatch $excludeFileSpecification | Select-Object -ExpandProperty Name);
+                        Where-Object Name -NotMatch $fileSpecification | Select-Object -ExpandProperty Name);
                 }
             }
             
@@ -365,20 +367,20 @@ function Read-NewFolder([string] $message)
     # -To create a non-existing directory.
     if ($prompt_reqPathToSendFiles.StartsWith('+'))
     {
-        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\+(\s+)?','';
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\+\s*','';
         New-Item -Path $prompt_reqPathToSendFiles -ItemType Directory -Force > $null;
     }
     # -To create folder(s) based on the item(s) names
     elseif ($prompt_reqPathToSendFiles.StartsWith('-')) 
     {
-        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\-(\s+)?','';
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\-\s*','';
         $prompt_reqPathToSendFiles = Read-HostPath -message $message -pathRequested $prompt_reqPathToSendFiles;
         $prompt_reqPathToSendFiles = '?' + $prompt_reqPathToSendFiles;
     }
     # -To create both new directories and based on names folder(s)
     elseif ($prompt_reqPathToSendFiles.StartsWith('*')) 
     {
-        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\*(\s+)?','';
+        $prompt_reqPathToSendFiles = $prompt_reqPathToSendFiles -replace '^\*\s*','';
         New-Item -Path $prompt_reqPathToSendFiles -ItemType Directory -Force > $null;
         $prompt_reqPathToSendFiles = '?' + $prompt_reqPathToSendFiles;
     }
